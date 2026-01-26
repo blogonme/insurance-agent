@@ -28,10 +28,11 @@ sudo chown -R $USER:$USER $WEB_ROOT
 echo "🚚 同步构建产物..."
 cp -r dist/* $WEB_ROOT/
 
-# 5. 配置 Nginx (如果尚未配置)
-if [ ! -f "$NGINX_CONF" ]; then
-    echo "⚙️ 检测到 Nginx 配置不存在，正在创建模板..."
-    sudo cp nginx.conf $NGINX_CONF
+# 5. 配置 Nginx
+echo "⚙️ 更新 Nginx 配置..."
+sudo cp nginx.conf $NGINX_CONF
+if [ ! -L "$NGINX_LINK" ]; then
+    echo "🔗 创建 Nginx 软链接..."
     sudo ln -s $NGINX_CONF $NGINX_LINK
 fi
 
