@@ -3,14 +3,15 @@ import {
   Home, BookOpen, Briefcase, Calendar, Award, User, Lock, Eye, 
   EyeOff, PlusCircle, ArrowUpCircle, Activity, TrendingUp, MoreHorizontal
 } from "lucide-react";
+import { ServiceCard, AboutSection } from "./components/LandingComponents";
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { ThemeSelector } from "./ThemeSelector";
+import { AppointmentModal, PlansModal, CaseDetailsModal, AssessmentModal, WeChatModal } from "./components/Modals";
 import { 
   INITIAL_PLANS, SERVICES, KNOWLEDGE_ITEMS, 
-  QUICK_TOOLS, TESTIMONIALS, INQUIRY_SUBJECTS, CASES 
+  QUICK_TOOLS, TESTIMONIALS, INQUIRY_SUBJECTS, CASES,
+  ASSESSMENT_QUESTIONS
 } from "./data.tsx";
-import { ServiceCard, AboutSection } from "./components/LandingComponents";
-import { AppointmentModal, PlansModal } from "./components/Modals";
 
 // 延迟加载后台管理模块，提升首屏性能
 const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
@@ -29,6 +30,25 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
+  const [isAssessmentOpen, setIsAssessmentOpen] = useState(false); // Assessment State
+  const [selectedCase, setSelectedCase] = useState<any>(null);
+
+  const handleAssessmentComplete = (answers: Record<string, string>) => {
+    const summary = Object.entries(answers).map(([q, a]) => `${q}: ${a}`).join('\n');
+    setInquiryForm(prev => ({
+        ...prev,
+        subject: "智能评估结果咨询",
+        content: `【智能风险评估报告】\n${summary}\n\n(用户已完成评估，请根据上述情况提供定制方案)`
+    }));
+    setIsAssessmentOpen(false);
+    setTimeout(() => setIsModalOpen(true), 300); // Open contact form
+  };
+
+  const [cases, setCases] = useState(CASES);
+  const [assessmentQuestions, setAssessmentQuestions] = useState(ASSESSMENT_QUESTIONS);
+  const [heroTab, setHeroTab] = useState<'plans'|'cases'>('plans');
+  const [qrTab, setQrTab] = useState<'personal' | 'oa'>('personal');
+  const [isWeChatModalOpen, setIsWeChatModalOpen] = useState(false);
 
   const SECTIONS = ['首页', '专业服务', '关于彭艳', '保险百科', '客户评价']; // 对应索引 0-4
   
@@ -102,6 +122,34 @@ function App() {
 
   const latestPlan = insurancePlans.find((p: any) => p.isLatest) || insurancePlans[0];
 
+  // --- Mobile Swipe Logic ---
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); // Reset
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && activeSection < SECTIONS.length - 1) {
+      goToSection(activeSection + 1);
+    }
+    if (isRightSwipe && activeSection > 0) {
+      goToSection(activeSection - 1);
+    }
+  };
+
   // --- 视图渲染：后台管理 ---
   if (viewMode === 'admin') {
     return (
@@ -109,8 +157,12 @@ function App() {
         <AdminDashboard 
           inquiries={inquiries}
           insurancePlans={insurancePlans}
+          cases={cases}
           setInquiries={setInquiries}
           setInsurancePlans={setInsurancePlans}
+          setCases={setCases}
+          assessmentQuestions={assessmentQuestions}
+          setAssessmentQuestions={setAssessmentQuestions}
           onExit={() => setViewMode('landing')}
           onLogout={() => setViewMode('landing')}
           authKey={AUTH_KEY}
@@ -166,7 +218,13 @@ function App() {
 
   // --- 视图渲染：门户首页 (水平翻页重构) ---
   return (
-    <div className="h-screen w-screen overflow-hidden bg-black text-white selection:bg-primary/30 font-sans relative" style={{ background: 'var(--app-background)' }}>
+    <div 
+      className="h-screen w-screen overflow-hidden bg-black text-white selection:bg-primary/30 font-sans relative" 
+      style={{ background: 'var(--app-background)' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* 1. 顶部导航栏 (固定) */}
       <nav className="fixed top-0 w-full z-[100] border-b border-white/5 bg-card/60 backdrop-blur-xl h-16 transition-all">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
@@ -204,77 +262,132 @@ function App() {
              {/* Hero 内容保持不变 */}
              <div className="max-w-7xl mx-auto flex flex-col items-center relative z-10 w-full">
                 {/* Top Section: Avatar (Left) + Text Info (Right) */}
-                <div className="flex flex-row items-center justify-between md:justify-start gap-4 md:gap-8 w-full mb-8 px-2">
-                   {/* Left: Avatar (Enlarged 2x) */}
-                   <div className="flex-shrink-0 relative group cursor-pointer animate-in fade-in zoom-in duration-700">
-                      <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-                      <img src="/assets/avatar.jpg" alt="彭艳" className="w-36 h-36 md:w-64 md:h-64 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
-                      <div className="absolute bottom-2 right-2 bg-primary text-white text-xs md:text-sm font-bold px-3 py-1 rounded-full border border-black/20 shadow-lg translate-y-1/4 translate-x-1/4 z-20">
-                        PRO
-                      </div>
+                <div className="flex flex-row items-center justify-between w-full mb-8 px-2">
+                   <div className="flex flex-row items-center gap-4 md:gap-8 flex-grow min-w-0 justify-start">
+                       
+                       {/* Left: Avatar Column */}
+                       <div className="flex flex-col items-center gap-3 md:gap-4 flex-shrink-0">
+                           {/* Avatar Image Wrapper */}
+                           <div className="relative group cursor-pointer animate-in fade-in zoom-in duration-700">
+                              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+                              <img src="/assets/avatar.jpg" alt="彭艳" className="w-36 h-36 md:w-64 md:h-64 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <div className="absolute bottom-2 right-2 bg-primary text-white text-xs md:text-sm font-bold px-3 py-1 rounded-full border border-black/20 shadow-lg translate-y-1/4 translate-x-1/4 z-20">
+                                PRO
+                              </div>
+                           </div>
+                           {/* Badge (Moved Here) */}
+                           <div className="bg-white/5 backdrop-blur-xl border border-white/10 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-sm font-bold tracking-widest text-primary flex items-center gap-2 uppercase whitespace-nowrap shadow-lg">
+                                <Award className="w-3 h-3 md:w-4 md:h-4" /> 连续五年阳光精英
+                           </div>
+                       </div>
+    
+                       {/* Middle: Text Content */}
+                       <div className="flex flex-col items-start text-left flex-grow min-w-0 justify-center h-full">
+                          <h1 className="text-2xl md:text-7xl font-black mb-3 leading-[1.1] tracking-tighter">
+                             把专业<br />留给深耕者
+                          </h1>
+                          <p className="text-gray-400 text-xs md:text-xl leading-relaxed font-medium opacity-80 line-clamp-2 md:line-clamp-none w-full">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-indigo-400 block mb-1">保障属于懂生活的人</span>
+                            只做您家庭资产的动态防护网。
+                          </p>
+                       </div>
                    </div>
 
-                   {/* Right: Text Content */}
-                   <div className="flex flex-col items-start text-left flex-grow min-w-0 justify-center h-full">
-                      <div className="bg-white/5 backdrop-blur-xl border border-white/10 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-sm font-bold tracking-widest text-primary mb-3 flex items-center gap-2 uppercase whitespace-nowrap">
-                        <Award className="w-3 h-3 md:w-4 md:h-4" /> 连续五年阳光精英
+                   {/* Right: QR Code */}
+                   <div className="hidden md:block flex-shrink-0 ml-4 md:ml-12">
+                      <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-2xl hover:scale-105 transition-transform duration-300 group/qr cursor-pointer">
+                         {/* Tabs */}
+                         <div className="flex bg-black/40 rounded-lg p-1 mb-3">
+                            <button 
+                                onClick={() => setQrTab('personal')}
+                                className={`flex-1 text-[10px] py-1 rounded-md font-bold transition-all ${qrTab === 'personal' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                个人号
+                            </button>
+                            <button 
+                                onClick={() => setQrTab('oa')}
+                                className={`flex-1 text-[10px] py-1 rounded-md font-bold transition-all ${qrTab === 'oa' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                公众号
+                            </button>
+                         </div>
+                         <div className="bg-white p-1 rounded-lg overflow-hidden relative w-24 h-24">
+                           <img src="/assets/qrcode_v2.png" alt="Personal QR" className={`w-full h-full object-cover transition-opacity duration-300 absolute inset-0 ${qrTab === 'personal' ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
+                           <img src="/assets/qrcode_oa.png" alt="OA QR" className={`w-full h-full object-cover transition-opacity duration-300 absolute inset-0 ${qrTab === 'oa' ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} />
+                         </div>
+                         <div className="text-center mt-2 mb-0.5">
+                            <div className="text-[10px] font-bold text-white group-hover/qr:text-primary transition-colors">
+                                {qrTab === 'personal' ? '扫一扫加好友' : '扫一扫关注'}
+                            </div>
+                         </div>
                       </div>
-                      <h1 className="text-2xl md:text-7xl font-black mb-3 leading-[1.1] tracking-tighter">
-                         把专业<br />留给深耕者
-                      </h1>
-                      <p className="text-gray-400 text-xs md:text-xl leading-relaxed font-medium opacity-80 line-clamp-2 md:line-clamp-none w-full">
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-indigo-400 block mb-1">保障属于懂生活的人</span>
-                        只做您家庭资产的动态防护网。
-                      </p>
                    </div>
                 </div>
 
                 <div className="flex flex-row gap-3 mb-6 w-full justify-start px-2">
-                   <button onClick={() => setIsModalOpen(true)} className="flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-white text-black text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-white/90 transition-all flex items-center justify-center gap-2 shadow-2xl shadow-white/10 group cursor-pointer">
-                     开启评估 <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
+                   <button onClick={() => setIsAssessmentOpen(true)} className="flex-1 md:flex-none px-6 py-3.5 md:px-8 md:py-5 bg-white text-black text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-white/10">
+                      开启评估 <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
                    </button>
-                   <button onClick={() => goToSection(1)} className="flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-neutral-900 border border-white/10 text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                   <button onClick={() => goToSection(1)} className="hidden md:flex flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-neutral-900 border border-white/10 text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-neutral-800 transition-all items-center justify-center gap-2 cursor-pointer">
                      专属服务
                    </button>
+                   {/* Mobile Only: Follow OA */}
+                   <button onClick={() => setIsWeChatModalOpen(true)} className="md:hidden flex-1 px-6 py-3.5 bg-neutral-900 border border-white/10 text-sm font-black rounded-2xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 cursor-pointer text-primary">
+                     关注公众号
+                   </button>
                 </div>
 
-                {/* 阳光精选方案卡片 */}
-                <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200 px-2 mb-6">
-                  <div 
-                    onClick={() => setIsPlansModalOpen(true)}
-                    className="bg-indigo-950/60 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 cursor-pointer hover:bg-indigo-900/60 hover:border-primary/30 transition-all group relative overflow-hidden"
-                  >
-                     <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0">
-                              <TrendingUp className="w-5 h-5" />
-                           </div>
-                           <div className="text-left">
-                              <div className="text-[10px] text-primary font-bold uppercase tracking-wider mb-0.5">本月精选方案</div>
-                              <h3 className="text-base font-bold text-white group-hover:text-primary transition-colors line-clamp-1">{latestPlan.title}</h3>
-                           </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                     </div>
-                  </div>
-                </div>
 
-                {/* 保险案例 (Filling the empty space) */}
-                <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300 px-2">
-                   <div className="flex items-center gap-2 mb-3 px-1">
-                      <div className="w-1 h-3 bg-primary rounded-full"></div>
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">实操案例</h4>
+
+                {/* Content Split View: Featured Plans & Cases */}
+                <div className="w-full max-w-xl flex flex-col gap-4 px-2 mt-4 min-h-0 flex-grow-0">
+                   
+                   {/* 1. Featured Plans (Scrollable) */}
+                   <div className="w-full bg-white/5 border border-white/5 rounded-2xl p-4 backdrop-blur-md flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest px-1">
+                         <TrendingUp className="w-4 h-4" /> 本月精选方案
+                      </div>
+                      <div className="max-h-[140px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        {insurancePlans.filter((p: any) => p.isLatest).map((plan: any) => (
+                           <div 
+                             key={plan.id}
+                             onClick={() => setIsPlansModalOpen(true)}
+                             className="bg-black/20 hover:bg-black/40 border border-white/5 rounded-xl p-3 cursor-pointer transition-all flex items-center justify-between group"
+                           >
+                              <div className="min-w-0">
+                                 <h4 className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{plan.title}</h4>
+                                 <p className="text-[10px] text-gray-400 truncate">{plan.highlight}</p>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors flex-shrink-0" />
+                           </div>
+                        ))}
+                        {insurancePlans.filter((p: any) => p.isLatest).length === 0 && (
+                           <div className="text-xs text-gray-500 py-2 text-center">暂无精选方案</div>
+                        )}
+                      </div>
                    </div>
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {CASES.map((item) => (
-                         <div key={item.id} className="bg-white/5 border border-white/5 rounded-xl p-3 flex items-center gap-3 hover:bg-white/10 transition-all cursor-pointer group">
-                            <div className="w-10 h-10 rounded-lg bg-cover bg-center shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `url(${item.image})` }}></div>
-                            <div className="text-left overflow-hidden">
-                               <div className="text-[10px] text-primary/80 font-bold mb-0.5">{item.tag}</div>
-                               <div className="text-xs text-gray-300 font-medium truncate group-hover:text-white transition-colors">{item.title.split('：')[1]}</div>
-                            </div>
-                         </div>
-                      ))}
+
+                   {/* 2. Cases (Scrollable) */}
+                   <div className="w-full bg-white/5 border border-white/5 rounded-2xl p-4 backdrop-blur-md flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-orange-400 font-bold text-xs uppercase tracking-widest px-1">
+                         <div className="w-1 h-3 bg-orange-400 rounded-full"></div> 实操案例
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        {cases.filter((item: any) => !item.isArchived).map((item) => (
+                           <div 
+                             key={item.id} 
+                             onClick={() => setSelectedCase(item)}
+                             className="bg-black/20 hover:bg-black/40 border border-white/5 rounded-xl p-3 flex items-center gap-3 transition-all cursor-pointer group"
+                           >
+                              <div className="w-10 h-10 rounded-lg bg-cover bg-center shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `url(${item.image})` }}></div>
+                              <div className="text-left flex-grow min-w-0">
+                                 <div className="text-[10px] text-primary/80 font-bold mb-0.5">{item.tag}</div>
+                                 <div className="text-xs text-gray-300 font-bold truncate group-hover:text-white transition-colors">{item.title}</div>
+                              </div>
+                              <ArrowRight className="w-3 h-3 text-white/10 group-hover:text-white/50" />
+                           </div>
+                        ))}
+                      </div>
                    </div>
                 </div>
              </div>
@@ -471,6 +584,25 @@ function App() {
         </div>
       </div>
 
+      {/* Admin Dashboard */}
+      {viewMode === 'admin' && (
+          <Suspense fallback={<div className="min-h-screen grid place-items-center text-white">加载后台系统中...</div>}>
+            <AdminDashboard 
+              inquiries={inquiries} 
+              insurancePlans={insurancePlans}
+              cases={cases}
+              assessmentQuestions={assessmentQuestions}
+              setInquiries={setInquiries}
+              setInsurancePlans={setInsurancePlans}
+              setCases={setCases}
+              setAssessmentQuestions={setAssessmentQuestions}
+              onExit={() => setViewMode('landing')}
+              onLogout={() => { setViewMode('login'); localStorage.removeItem(AUTH_KEY); }}
+              authKey={AUTH_KEY}
+            />
+          </Suspense>
+        )}
+
       {/* 弹窗组件 */}
       <AppointmentModal 
         isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
@@ -480,6 +612,21 @@ function App() {
       <PlansModal 
         isOpen={isPlansModalOpen} onClose={() => setIsPlansModalOpen(false)} 
         plans={insurancePlans} 
+      />
+      <CaseDetailsModal 
+        isOpen={!!selectedCase} 
+        onClose={() => setSelectedCase(null)} 
+        item={selectedCase} 
+      />
+      <AssessmentModal 
+        isOpen={isAssessmentOpen} 
+        onClose={() => setIsAssessmentOpen(false)} 
+        questions={assessmentQuestions}
+        onComplete={handleAssessmentComplete}
+      />
+      <WeChatModal 
+        isOpen={isWeChatModalOpen} 
+        onClose={() => setIsWeChatModalOpen(false)} 
       />
     </div>
   );

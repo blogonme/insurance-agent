@@ -1,5 +1,153 @@
 import React from 'react';
-import { X, CheckCircle2, ChevronDown, User, Calendar, ArrowRight } from "lucide-react";
+import { X, CheckCircle2, ChevronDown, User, Calendar, ArrowRight, ChevronRight } from "lucide-react";
+import { AssessmentQuestion } from "../data";
+import { useState, useEffect } from "react";
+
+// ... existing interfaces ...
+
+interface AssessmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  questions: AssessmentQuestion[];
+  onComplete: (answers: Record<string, string>) => void;
+}
+
+
+export const AssessmentModal = ({ isOpen, onClose, questions, onComplete }: AssessmentModalProps) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [tempSelection, setTempSelection] = useState<string[]>([]);
+
+  // Reset when opened
+  useEffect(() => {
+    if (isOpen) {
+        setCurrentStep(0);
+        setAnswers({});
+        setTempSelection([]);
+    }
+  }, [isOpen]);
+
+  // Reset temp selection on step change
+  useEffect(() => {
+     setTempSelection([]);
+  }, [currentStep]);
+
+  const currentQ = questions[currentStep];
+
+  const handleSelectOption = (option: string) => {
+    if (isAnimating) return;
+    
+    if (currentQ.type === 'multiple') {
+        setTempSelection(prev => 
+            prev.includes(option) ? prev.filter(o => o !== option) : [...prev, option]
+        );
+    } else {
+        saveAndNext(option);
+    }
+  };
+
+  const handleNext = () => {
+     if (tempSelection.length === 0) return;
+     saveAndNext(tempSelection.join(', '));
+  };
+
+  const saveAndNext = (answerValue: string) => {
+    const newAnswers = { ...answers, [currentQ.question]: answerValue };
+    setAnswers(newAnswers);
+
+    if (currentStep < questions.length - 1) {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setCurrentStep(prev => prev + 1);
+        setIsAnimating(false);
+      }, 300);
+    } else {
+      // Completed
+      onComplete(newAnswers);
+    }
+  };
+
+  if (!isOpen) return null;
+  // currentQ definition moved up
+  const progress = ((currentStep + 1) / questions.length) * 100;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-left">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose}></div>
+      <div className="relative bg-neutral-900 border border-white/10 w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+        
+        {/* Header / Progress */}
+        <div className="p-8 pb-0 flex items-center justify-between">
+            <div className="text-gray-500 font-bold text-xs uppercase tracking-widest">
+                保险需求智能评估 · 第 {currentStep + 1}/{questions.length} 步
+            </div>
+            <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+            </button>
+        </div>
+        <div className="px-8 mt-6">
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
+            </div>
+        </div>
+
+        {/* Question Area */}
+        <div className="p-8 md:p-12 min-h-[400px] flex flex-col justify-center">
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2 leading-tight">
+                {currentQ.question}
+            </h2>
+            {currentQ.type === 'multiple' && (
+                <p className="text-gray-500 text-sm mb-8">（可多选）</p>
+            )}
+            {currentQ.type !== 'multiple' && <div className="mb-8"></div>}
+
+            <div className={`grid gap-4 transition-all duration-300 ${isAnimating ? 'opacity-0 translate-x-10' : 'opacity-100 translate-x-0'}`}>
+                {currentQ.options.map((opt, idx) => {
+                    const isSelected = currentQ.type === 'multiple' && tempSelection.includes(opt);
+                    return (
+                        <button 
+                            key={idx}
+                            onClick={() => handleSelectOption(opt)}
+                            className={`group flex items-center justify-between p-5 rounded-2xl border transition-all text-left ${
+                                isSelected 
+                                ? "bg-primary border-primary text-white" 
+                                : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-primary/30 text-gray-300"
+                            }`}
+                        >
+                            <span className={`font-bold text-lg ${isSelected ? "text-white" : "group-hover:text-white"}`}>{opt}</span>
+                            {isSelected ? (
+                                <CheckCircle2 className="w-6 h-6 text-white" />
+                            ) : (
+                                <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-white opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+            
+            {/* Next Button for Multiple Selection */}
+            {currentQ.type === 'multiple' && (
+                <div className="mt-8 flex justify-end">
+                    <button 
+                        onClick={handleNext}
+                        disabled={tempSelection.length === 0}
+                        className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${
+                            tempSelection.length > 0 
+                            ? "bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20" 
+                            : "bg-white/5 text-gray-500 cursor-not-allowed"
+                        }`}
+                    >
+                        下一步 <ArrowRight className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -146,6 +294,82 @@ export const PlansModal = ({ isOpen, onClose, plans }: PlansModalProps) => {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+interface CaseDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  item: any;
+}
+
+export const CaseDetailsModal = ({ isOpen, onClose, item }: CaseDetailsModalProps) => {
+  if (!isOpen || !item) return null;
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-300" onClick={onClose}></div>
+      <div className="relative w-full max-w-lg bg-card border border-white/10 rounded-[32px] overflow-hidden animate-in zoom-in-95 duration-500 shadow-2xl flex flex-col">
+        <div className="h-48 bg-cover bg-center relative" style={{ backgroundImage: `url(${item.image})` }}>
+           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+           <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors z-20">
+              <X className="w-4 h-4 text-white" />
+           </button>
+           <div className="absolute bottom-6 left-6 right-6">
+              <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/20 text-[10px] font-bold uppercase tracking-widest mb-2 backdrop-blur-md">
+                {item.tag}
+              </span>
+              <h3 className="text-xl font-bold text-white leading-tight">{item.title}</h3>
+           </div>
+        </div>
+        <div className="p-8">
+           <div className="space-y-4">
+              <p className="text-gray-300 text-sm leading-relaxed">
+                {/* 模拟详情内容，实际项目中应在 data 中添加 detail 字段 */}
+                本案例为您展示了{item.tag}在实际场景中的应用。通过{item.title.split('：')[0]}的配置，我们在风险发生时为客户争取了最大化的利益保护。如需了解该案例的详细操作流程与法律依据，欢迎预约咨询。
+              </p>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-start gap-3">
+                 <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                 <div className="text-xs text-gray-400">
+                    <span className="text-white font-bold block mb-1">专业点评</span>
+                    该方案的核心在于提前布局与精准条款匹配，避免了后期理赔中的常见纠纷。
+                 </div>
+              </div>
+           </div>
+           
+           <button onClick={onClose} className="w-full mt-8 py-4 bg-primary text-white rounded-2xl font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+             预约同款方案咨询 <ArrowRight className="w-4 h-4" />
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface WeChatModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const WeChatModal = ({ isOpen, onClose }: WeChatModalProps) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300" onClick={onClose}></div>
+      <div className="relative w-full max-w-sm bg-neutral-900 border border-white/10 rounded-[32px] overflow-hidden animate-in zoom-in-95 duration-300 shadow-2xl p-8 text-center">
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white">
+          <X className="w-5 h-5" />
+        </button>
+        <h3 className="text-xl font-bold text-white mb-2">关注保险经纪人彭艳</h3>
+        <p className="text-sm text-gray-500 mb-8">这是我的微信公众号，分享保险干货与案例</p>
+        
+        <div className="bg-white p-2 rounded-2xl mx-auto mb-6 w-48 h-48">
+          <img src="/assets/qrcode_oa.png" alt="公众号二维码" className="w-full h-full object-cover" />
+        </div>
+        
+        <p className="text-xs text-primary font-bold uppercase tracking-widest mb-2">长按识别二维码</p>
+        <p className="text-xs text-gray-600">或搜索 "InsurePro_Py"</p>
       </div>
     </div>
   );

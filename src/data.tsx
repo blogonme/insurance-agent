@@ -38,9 +38,9 @@ export const INITIAL_PLANS = [
 ];
 
 export const SERVICES = [
-  { id: "risk", title: "家庭风险全面评估", desc: "深入分析家庭财务状况，识别潜在风险漏洞，构建稳固的家庭防护网。", icon: <Shield className="w-7 h-7" /> },
-  { id: "wealth", title: "高净值财富传承", desc: "针对高端客户，提供家族信托与终身寿险相结合的跨代分资方案。", icon: <Star className="w-7 h-7" /> },
-  { id: "claims", title: "全程理赔管家服务", desc: "从报案到结案，专人介入指导，确保客户权益得到最大化保障。", icon: <CheckCircle2 className="w-7 h-7" /> },
+  { id: "risk", title: "家庭风险全面评估", description: "深入分析家庭财务状况，识别潜在风险漏洞，构建稳固的家庭防护网。", icon: <Shield className="w-7 h-7" /> },
+  { id: "wealth", title: "高净值财富传承", description: "针对高端客户，提供家族信托与终身寿险相结合的跨代分资方案。", icon: <Star className="w-7 h-7" /> },
+  { id: "claims", title: "全程理赔管家服务", description: "从报案到结案，专人介入指导，确保客户权益得到最大化保障。", icon: <CheckCircle2 className="w-7 h-7" /> },
 ];
 
 export const KNOWLEDGE_ITEMS = [
@@ -75,5 +75,45 @@ export const INQUIRY_SUBJECTS = [
 export const CASES = [
   { id: 1, title: "理赔实录：320万医疗费全额赔付", tag: "重疾理赔", image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=200&h=150" },
   { id: 2, title: "养老规划：35岁如何布局千万养老金", tag: "财富增值", image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=200&h=150" },
-  { id: 3, title: "家庭信托：资产隔离与定向传承实操", tag: "法商智慧", image: "https://images.unsplash.com/photo-1565514020176-db79238b9393?auto=format&fit=crop&q=80&w=200&h=150" }
+  { id: 3, title: "家庭信托：资产隔离与定向传承实操", tag: "法商智慧", image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=200&h=150" }
+];
+
+export interface AssessmentQuestion {
+  id: number;
+  question: string;
+  type: 'single' | 'multiple';
+  options: string[];
+}
+
+export const ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
+  {
+    id: 1,
+    question: "您的年龄段位于？",
+    type: "single",
+    options: ["18-25岁 (初入职场)", "26-35岁 (家庭形成期)", "36-50岁 (事业稳定期)", "51-60岁 (退休准备期)", "60岁以上 (安享晚年)"]
+  },
+  {
+    id: 2,
+    question: "目前的家庭结构是？",
+    type: "single",
+    options: ["单身贵族", "二人世界", "三口之家 (有未成年子女)", "三世同堂 (赡养父母)", "单亲家庭"]
+  },
+  {
+    id: 3,
+    question: "家庭大致年收入范围？",
+    type: "single",
+    options: ["10万以下", "10-30万", "30-50万", "50-100万", "100万以上"]
+  },
+  {
+    id: 4,
+    question: "目前已有哪些商业保险配置？",
+    type: "multiple",
+    options: ["暂无配置", "仅有意外险/医疗险", "已有重疾险", "配置较全 (含寿险/年金)", "不清楚"]
+  },
+  {
+    id: 5,
+    question: "您当前最核心的担忧是什么？",
+    type: "multiple",
+    options: ["大病医疗突发支出", "家庭支柱发生意外", "子女教育未来储备", "养老生活品质下降", "财富安全与传承"]
+  }
 ];
