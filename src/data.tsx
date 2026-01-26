@@ -69,6 +69,11 @@ export const INQUIRY_SUBJECTS = [
   "子女教育金规划",
   "养老退休财务安排",
   "高额医疗与重疾保障",
-  "保单检视与理赔咨询",
   "其他需求..."
+];
+
+export const CASES = [
+  { id: 1, title: "理赔实录：320万医疗费全额赔付", tag: "重疾理赔", image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=200&h=150" },
+  { id: 2, title: "养老规划：35岁如何布局千万养老金", tag: "财富增值", image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=200&h=150" },
+  { id: 3, title: "家庭信托：资产隔离与定向传承实操", tag: "法商智慧", image: "https://images.unsplash.com/photo-1565514020176-db79238b9393?auto=format&fit=crop&q=80&w=200&h=150" }
 ];

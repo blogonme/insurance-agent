@@ -7,7 +7,7 @@ import React, { useState, useEffect, lazy, Suspense } from "react";
 import { ThemeSelector } from "./ThemeSelector";
 import { 
   INITIAL_PLANS, SERVICES, KNOWLEDGE_ITEMS, 
-  QUICK_TOOLS, TESTIMONIALS, INQUIRY_SUBJECTS 
+  QUICK_TOOLS, TESTIMONIALS, INQUIRY_SUBJECTS, CASES 
 } from "./data.tsx";
 import { ServiceCard, AboutSection } from "./components/LandingComponents";
 import { AppointmentModal, PlansModal } from "./components/Modals";
@@ -200,36 +200,46 @@ function App() {
       >
         {/* SECTION 0: Hero */}
         <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-0 scroll-container">
-          <section className="relative min-h-[calc(100vh-64px)] flex flex-col justify-start items-center text-center px-6 pt-24 md:pt-40 pb-24 md:pb-12">
+          <section className="relative min-h-[calc(100vh-64px)] flex flex-col justify-start items-center text-center px-6 pt-28 md:pt-40 pb-24 md:pb-12">
              {/* Hero 内容保持不变 */}
              <div className="max-w-7xl mx-auto flex flex-col items-center relative z-10 w-full">
-                <div className="mb-4 relative group cursor-pointer animate-in fade-in zoom-in duration-700">
-                  <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-                  <img src="/assets/avatar.jpg" alt="彭艳" className="w-20 h-20 md:w-32 md:h-32 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute bottom-0 right-0 bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-black/20 shadow-lg translate-y-1/2 translate-x-1/4">
-                    PRO
-                  </div>
+                {/* Top Section: Avatar (Left) + Text Info (Right) */}
+                <div className="flex flex-row items-center justify-between md:justify-start gap-4 md:gap-8 w-full mb-8 px-2">
+                   {/* Left: Avatar (Enlarged 2x) */}
+                   <div className="flex-shrink-0 relative group cursor-pointer animate-in fade-in zoom-in duration-700">
+                      <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
+                      <img src="/assets/avatar.jpg" alt="彭艳" className="w-36 h-36 md:w-64 md:h-64 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <div className="absolute bottom-2 right-2 bg-primary text-white text-xs md:text-sm font-bold px-3 py-1 rounded-full border border-black/20 shadow-lg translate-y-1/4 translate-x-1/4 z-20">
+                        PRO
+                      </div>
+                   </div>
+
+                   {/* Right: Text Content */}
+                   <div className="flex flex-col items-start text-left flex-grow min-w-0 justify-center h-full">
+                      <div className="bg-white/5 backdrop-blur-xl border border-white/10 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-sm font-bold tracking-widest text-primary mb-3 flex items-center gap-2 uppercase whitespace-nowrap">
+                        <Award className="w-3 h-3 md:w-4 md:h-4" /> 连续五年阳光精英
+                      </div>
+                      <h1 className="text-2xl md:text-7xl font-black mb-3 leading-[1.1] tracking-tighter">
+                         把专业<br />留给深耕者
+                      </h1>
+                      <p className="text-gray-400 text-xs md:text-xl leading-relaxed font-medium opacity-80 line-clamp-2 md:line-clamp-none w-full">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-indigo-400 block mb-1">保障属于懂生活的人</span>
+                        只做您家庭资产的动态防护网。
+                      </p>
+                   </div>
                 </div>
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-1.5 rounded-full text-[10px] md:text-sm font-bold tracking-widest text-primary mb-4 flex items-center gap-2 uppercase">
-                  <Award className="w-3 h-3 md:w-4 md:h-4" /> 连续五年阳光保险年度精英理财师
-                </div>
-                <h1 className="text-2xl md:text-7xl font-black mb-4 leading-[1.1] tracking-tighter">
-                   把专业留给深耕者<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-400 to-indigo-400">保障属于懂生活的人</span>
-                </h1>
-                <p className="max-w-xl text-gray-400 text-sm md:text-2xl mb-6 leading-relaxed font-medium px-4 opacity-80 line-clamp-2 md:line-clamp-none">
-                  为您定制超越预期的保险配置方案。只做您家庭资产的动态防护网。
-                </p>
-                <div className="flex flex-col md:flex-row gap-3 mb-6 w-full md:w-auto">
-                   <button onClick={() => setIsModalOpen(true)} className="w-full md:w-auto px-6 py-3.5 md:px-12 md:py-5 bg-white text-black text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-white/90 transition-all flex items-center justify-center gap-2 shadow-2xl shadow-white/10 group cursor-pointer">
-                     立即开启专业评估 <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
+
+                <div className="flex flex-row gap-3 mb-6 w-full justify-start px-2">
+                   <button onClick={() => setIsModalOpen(true)} className="flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-white text-black text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-white/90 transition-all flex items-center justify-center gap-2 shadow-2xl shadow-white/10 group cursor-pointer">
+                     开启评估 <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
                    </button>
-                   <button onClick={() => goToSection(1)} className="w-full md:w-auto px-6 py-3.5 md:px-12 md:py-5 bg-neutral-900 border border-white/10 text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                     探索专属服务
+                   <button onClick={() => goToSection(1)} className="flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-neutral-900 border border-white/10 text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-neutral-800 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                     专属服务
                    </button>
                 </div>
 
                 {/* 阳光精选方案卡片 */}
-                <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200 px-2 mb-6">
                   <div 
                     onClick={() => setIsPlansModalOpen(true)}
                     className="bg-indigo-950/60 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 cursor-pointer hover:bg-indigo-900/60 hover:border-primary/30 transition-all group relative overflow-hidden"
@@ -248,6 +258,25 @@ function App() {
                      </div>
                   </div>
                 </div>
+
+                {/* 保险案例 (Filling the empty space) */}
+                <div className="w-full max-w-xl animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300 px-2">
+                   <div className="flex items-center gap-2 mb-3 px-1">
+                      <div className="w-1 h-3 bg-primary rounded-full"></div>
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">实操案例</h4>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {CASES.map((item) => (
+                         <div key={item.id} className="bg-white/5 border border-white/5 rounded-xl p-3 flex items-center gap-3 hover:bg-white/10 transition-all cursor-pointer group">
+                            <div className="w-10 h-10 rounded-lg bg-cover bg-center shrink-0 opacity-80 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `url(${item.image})` }}></div>
+                            <div className="text-left overflow-hidden">
+                               <div className="text-[10px] text-primary/80 font-bold mb-0.5">{item.tag}</div>
+                               <div className="text-xs text-gray-300 font-medium truncate group-hover:text-white transition-colors">{item.title.split('：')[1]}</div>
+                            </div>
+                         </div>
+                      ))}
+                   </div>
+                </div>
              </div>
              {/* 背景装饰 */}
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none opacity-20 z-0">
@@ -258,7 +287,7 @@ function App() {
         </div>
 
         {/* SECTION 1: Services */}
-        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-24 pb-32 scroll-container">
+        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-28 pb-32 scroll-container">
           <section className="max-w-7xl mx-auto px-6 min-h-full flex flex-col">
             <div className="text-center mb-12 flex-shrink-0">
               <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight">我们的核心专业</h2>
@@ -273,12 +302,12 @@ function App() {
         </div>
 
         {/* SECTION 2: About (使用 AboutSection 组件) */}
-        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-24 pb-32 scroll-container">
+        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-28 pb-32 scroll-container">
            <AboutSection />
         </div>
 
         {/* SECTION 3: Knowledge & Tools */}
-        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-24 pb-32 scroll-container">
+        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-28 pb-32 scroll-container">
           <section className="max-w-7xl mx-auto px-6 min-h-full flex flex-col justify-center">
              <div className="grid lg:grid-cols-2 gap-10 md:gap-20 items-center">
               <div className="text-left space-y-8 order-2 lg:order-1">
@@ -336,7 +365,7 @@ function App() {
         </div>
 
         {/* SECTION 4: Testimonials */}
-        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-24 pb-32 scroll-container">
+        <div className="w-full h-full flex-shrink-0 overflow-y-auto overflow-x-hidden pt-28 pb-32 scroll-container">
            <section className="max-w-7xl mx-auto px-6 h-full flex flex-col">
               <div className="text-center mb-16 flex-shrink-0">
                 <h2 className="text-4xl font-bold mb-4">客户声音</h2>
