@@ -24,13 +24,14 @@ const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
 // const INQUIRIES_STORAGE_KEY = "insurepro_inquiries";
 
 function App() {
-  const { user, signInWithPhone, verifyOtp, signOut } = useAuth();
+  const { user, signInWithPassword, signOut } = useAuth();
 
   // 核心路由与 UI 状态
   const [viewMode, setViewMode] = useState<'landing' | 'login' | 'admin'>('landing');
   const [currentTenant, setCurrentTenant] = useState<{ id: string, name: string, slug: string } | null>(null);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [isResolved, setIsResolved] = useState(false);
+  const [isSharedView, setIsSharedView] = useState(false);
 
   // 租户解析与初始路由逻辑
   useEffect(() => {
@@ -43,6 +44,7 @@ function App() {
         const { data: tenant } = await db.getTenantBySlug(slug);
         if (tenant) {
           setCurrentTenant(tenant);
+          setIsSharedView(true); // Mark as shared view
           const { data: profile } = await db.getTenantProfile(tenant.id);
           if (profile) setTenantProfile(profile);
           setViewMode('landing');
@@ -105,8 +107,8 @@ function App() {
   
   // 登录相关状态
   const [phone, setPhone] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -192,35 +194,19 @@ function App() {
     });
   };
 
-  // 处理发送验证码
-  const handleSendOtp = async (e: React.FormEvent) => {
+  // 处理登录
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) return setErrorMsg("请输入手机号");
+    if (!password) return setErrorMsg("请输入密码");
     
     setIsAuthLoading(true);
     setErrorMsg("");
-    const { error } = await signInWithPhone(phone);
+    const { error } = await signInWithPassword(phone, password);
     setIsAuthLoading(false);
-
+    
     if (error) {
-      setErrorMsg(error.message || "发送失败，请稍后重试");
-    } else {
-      setIsOtpSent(true);
-    }
-  };
-
-  // 处理验证码登入
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode) return setErrorMsg("请输入验证码");
-
-    setIsAuthLoading(true);
-    setErrorMsg("");
-    const { error } = await verifyOtp(phone, otpCode);
-    setIsAuthLoading(false);
-
-    if (error) {
-      setErrorMsg(error.message || "验证失败，请检查验证码");
+      setErrorMsg(error.message || "登录失败，请检查账号密码");
     }
   };
 
@@ -300,54 +286,44 @@ function App() {
           </div>
           
           <div className="bg-card border border-white/10 p-8 rounded-[32px] shadow-2xl text-left">
-            {!isOtpSent ? (
-              <form onSubmit={handleSendOtp} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">手机号</label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <input 
-                      type="tel" placeholder="13800138000" required
-                      value={phone} onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary focus:outline-none transition-all"
-                    />
-                  </div>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">手机号</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input 
+                    type="tel" placeholder="13800138000" required
+                    value={phone} onChange={(e) => setPhone(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary focus:outline-none transition-all"
+                  />
                 </div>
-                {errorMsg && <div className="text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
-                <button 
-                  type="submit" disabled={isAuthLoading}
-                  className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-4 hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
-                >
-                  {isAuthLoading ? "正在发送..." : "发送验证码"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">验证码 (发送至 {phone})</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <input 
-                      type="text" placeholder="123456" autoFocus required
-                      value={otpCode} onChange={(e) => setOtpCode(e.target.value)}
-                      className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary focus:outline-none transition-all font-mono tracking-[1em] text-center"
-                    />
-                  </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">密码</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input 
+                    type={showPassword ? "text" : "password"} placeholder="请输入密码" required
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-12 focus:border-primary focus:outline-none transition-all"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
-                {errorMsg && <div className="text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
-            <button type="submit" disabled={isAuthLoading}
-                   className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-4 hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
-                 >
-                   {isAuthLoading ? "正在验证..." : "确认登录"}
-                 </button>
-                 <button 
-                   type="button" onClick={() => setIsOtpSent(false)}
-                   className="w-full text-gray-500 text-xs font-bold hover:text-white transition-colors"
-                 >
-                   修改手机号
-                 </button>
-               </form>
-             )}
+              </div>
+              {errorMsg && <div className="text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
+              <button 
+                type="submit" disabled={isAuthLoading}
+                className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-4 hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
+              >
+                {isAuthLoading ? "正在登录..." : "立即登录"}
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -646,7 +622,7 @@ function App() {
                   <div className="mb-4 flex justify-center items-center gap-2 text-white font-bold"><Shield className="w-5 h-5"/> InsurePro · {tenantProfile?.full_name || '彭艳'}</div>
                   <p>© 2026 {tenantProfile?.full_name || '彭艳'} · {tenantProfile?.raw_user_meta_data?.company || '阳光保险集团'} | {tenantProfile?.raw_user_meta_data?.title || '高级理财规划师'}</p>
                  <div className="mt-4 flex justify-center gap-6">
-                    <button onClick={() => setViewMode('admin')} className="hover:text-white underline">管理入口</button>
+                    {!isSharedView && <button onClick={() => setViewMode('admin')} className="hover:text-white underline">管理入口</button>}
                     <button className="hover:text-white">隐私政策</button>
                  </div>
               </footer>
@@ -684,10 +660,14 @@ function App() {
                     {item.icon} {item.label}
                  </button>
               ))}
-              <div className="h-px bg-white/10 my-1"></div>
-              <button onClick={() => setViewMode('admin')} className="w-full flex items-center gap-2 p-2.5 rounded-xl hover:bg-white/5 text-gray-300 text-xs font-bold active:bg-white/10 text-left">
-                 <Lock className="w-4 h-4"/> 管理入口
-              </button>
+              {!isSharedView && (
+                <>
+                  <div className="h-px bg-white/10 my-1"></div>
+                  <button onClick={() => setViewMode('admin')} className="w-full flex items-center gap-2 p-2.5 rounded-xl hover:bg-white/5 text-gray-300 text-xs font-bold active:bg-white/10 text-left">
+                     <Lock className="w-4 h-4"/> 管理入口
+                  </button>
+                </>
+              )}
            </div>
         )}
         
