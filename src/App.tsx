@@ -1,7 +1,7 @@
 import {
   Shield, ChevronRight, ChevronLeft, Menu, X, ArrowRight, Star, CheckCircle2, 
   Home, BookOpen, Briefcase, Calendar, Award, User, Lock, Eye, 
-  EyeOff, PlusCircle, ArrowUpCircle, Activity, TrendingUp, MoreHorizontal
+  EyeOff, PlusCircle, ArrowUpCircle, Activity, TrendingUp, MoreHorizontal, Share2
 } from "lucide-react";
 import { ServiceCard, AboutSection } from "./components/LandingComponents";
 import React, { useState, useEffect, lazy, Suspense } from "react";
@@ -12,19 +12,70 @@ import {
   QUICK_TOOLS, TESTIMONIALS, INQUIRY_SUBJECTS, CASES,
   ASSESSMENT_QUESTIONS
 } from "./data.tsx";
+import { useAuth } from "./contexts/AuthContext";
+import { db } from "./services/db";
+import { InsurancePlan, Case, Inquiry, AssessmentQuestion } from "./types";
 
 // 延迟加载后台管理模块，提升首屏性能
 const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
 
-// --- 常量与缓存 Key ---
-const AUTH_KEY = "admin_password";
-const DEFAULT_PASS = "admin";
-const PLANS_STORAGE_KEY = "insurepro_plans";
-const INQUIRIES_STORAGE_KEY = "insurepro_inquiries";
+// --- 缓存 Key (Legacy removed) ---
+// const PLANS_STORAGE_KEY = "insurepro_plans";
+// const INQUIRIES_STORAGE_KEY = "insurepro_inquiries";
 
 function App() {
+  const { user, signInWithPhone, verifyOtp, signOut } = useAuth();
+
   // 核心路由与 UI 状态
   const [viewMode, setViewMode] = useState<'landing' | 'login' | 'admin'>('landing');
+  const [currentTenant, setCurrentTenant] = useState<{ id: string, name: string, slug: string } | null>(null);
+  const [tenantProfile, setTenantProfile] = useState<any>(null);
+  const [isResolved, setIsResolved] = useState(false);
+
+  // 租户解析与初始路由逻辑
+  useEffect(() => {
+    const resolveTenant = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('s');
+
+      if (slug) {
+        // 如果有 URL 参数，尝试解析租户
+        const { data: tenant } = await db.getTenantBySlug(slug);
+        if (tenant) {
+          setCurrentTenant(tenant);
+          const { data: profile } = await db.getTenantProfile(tenant.id);
+          if (profile) setTenantProfile(profile);
+          setViewMode('landing');
+        } else {
+          console.error('Tenant not found for slug:', slug);
+          // 找不到租户时，可以保持 landing 但提示错误，或者进入演示模式
+        }
+      } else if (!user) {
+        // 无参数且未登录，默认进入登录页或演示
+        setViewMode('login');
+      } else {
+        // 已登录且无特定租户参数，锁定为自己的租户
+        const { data: tenant } = await db.getTenantByUserId(user.id);
+        if (tenant) {
+           setCurrentTenant(tenant);
+           const { data: profile } = await db.getTenantProfile(tenant.id);
+           if (profile) setTenantProfile(profile);
+        }
+        setViewMode('landing');
+      }
+      setIsResolved(true);
+    };
+
+    resolveTenant();
+  }, [user]);
+
+  // 当登录状态改变时，根据身份自动锁定租户（如果是经纪人）
+  useEffect(() => {
+    if (user && !currentTenant) {
+       // 如果已登录但尚未通过 URL 锁定租户，则可以默认锁定为自己的租户 (TODO: Fetch own tenant)
+    }
+  }, [user]);
+
   const [activeSection, setActiveSection] = useState(0); 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -44,73 +95,138 @@ function App() {
     setTimeout(() => setIsModalOpen(true), 300); // Open contact form
   };
 
-  const [cases, setCases] = useState(CASES);
-  const [assessmentQuestions, setAssessmentQuestions] = useState(ASSESSMENT_QUESTIONS);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([]);
   const [heroTab, setHeroTab] = useState<'plans'|'cases'>('plans');
   const [qrTab, setQrTab] = useState<'personal' | 'oa'>('personal');
   const [isWeChatModalOpen, setIsWeChatModalOpen] = useState(false);
 
-  const SECTIONS = ['首页', '专业服务', '关于彭艳', '保险百科', '客户评价']; // 对应索引 0-4
+  const SECTIONS = ['首页', '专业服务', `关于${tenantProfile?.full_name || '我'}`, '保险百科', '客户评价']; // 对应索引 0-4
   
-  // 登录状态
-  const [loginPass, setLoginPass] = useState("");
-  const [showPass, setShowPass] = useState(false);
+  // 登录相关状态
+  const [phone, setPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [isOtpSent, setIsOtpSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
-  // 保险方案持久化
-  const [insurancePlans, setInsurancePlans] = useState(() => {
-    const saved = localStorage.getItem(PLANS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : INITIAL_PLANS;
-  });
-
-  // 咨询数据持久化
-  const [inquiries, setInquiries] = useState<any[]>(() => {
-    const saved = localStorage.getItem(INQUIRIES_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
+  // 业务数据状态
+  const [insurancePlans, setInsurancePlans] = useState<InsurancePlan[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
 
   const [inquiryForm, setInquiryForm] = useState({
     name: "", phone: "", subject: "家庭保障方案定制", content: "", willingToCall: true
   });
 
-  // 副作用：同步至 LocalStorage
+  // 副作用：从 Supabase 初始化数据
   useEffect(() => {
-    localStorage.setItem(PLANS_STORAGE_KEY, JSON.stringify(insurancePlans));
-  }, [insurancePlans]);
+    if (!isResolved) return;
 
-  useEffect(() => {
-    localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
-  }, [inquiries]);
+    const fetchData = async () => {
+      // 如果已获取租户 ID，则只拉取该租户的数据；否则（经纪人模式）根据 RLS 自动过滤
+      const tid = currentTenant?.id;
 
-  useEffect(() => {
-    if (!localStorage.getItem(AUTH_KEY)) localStorage.setItem(AUTH_KEY, DEFAULT_PASS);
-  }, []);
+      const { data: plans } = await db.getPlans(tid);
+      if (plans) setInsurancePlans(plans as InsurancePlan[]);
 
-  // 逻辑：处理咨询提交
-  const handleInquirySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newInquiry = {
-      ...inquiryForm,
-      finalContent: inquiryForm.subject === "其他需求..." ? inquiryForm.content : inquiryForm.subject,
-      id: Date.now(),
-      status: 'pending',
-      createdAt: new Date().toLocaleString()
+      const { data: c } = await db.getCases(tid);
+      if (c) setCases(c as Case[]);
+
+      const { data: q } = await db.getAssessmentQuestions(tid);
+      if (q) setAssessmentQuestions(q as AssessmentQuestion[]);
+
+      // 仅在已登录且在管理模式时加载咨询记录
+      if (user && viewMode === 'admin') {
+        const { data: inq } = await db.getInquiries();
+        if (inq) setInquiries(inq as Inquiry[]);
+      }
     };
-    setInquiries([newInquiry, ...inquiries]);
+    fetchData();
+  }, [user, currentTenant, viewMode, isResolved]);
+
+  // 逻辑：处理咨询提交 (写入 Supabase)
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // 如果是匿名用户且没有租户上下文，在 RLS 模式下目前前端所有租户共享一个 Demo ID 或由后端触发器处理。
+    // 考虑到目前是单人/单租户演示，我们默认让触发器或手动设置生效。
+    
+    const finalContent = inquiryForm.subject === "其他需求..." ? inquiryForm.content : inquiryForm.subject;
+    
+    // 提交咨询时，必须绑定租户 ID
+    const targetTenantId = currentTenant?.id;
+
+    if (!targetTenantId) {
+       alert("无法识别租户信息，无法提交咨询。");
+       return;
+    }
+
+    const { data, error } = await db.createInquiry({
+      tenant_id: targetTenantId,
+      customer_name: inquiryForm.name,
+      phone: inquiryForm.phone,
+      subject: finalContent,
+      status: 'pending'
+    });
+
+    if (error) {
+      alert("提交失败，请稍后重试: " + error.message);
+      return;
+    }
+
+    if (data) setInquiries([data as Inquiry, ...inquiries]);
     setIsModalOpen(false);
     setInquiryForm({ name: "", phone: "", subject: "家庭保障方案定制", content: "", willingToCall: true });
-    alert("预约成功！彭艳经理将尽快与您联系。");
+    alert(`预约成功！${tenantProfile?.full_name || '我'}经理将尽快与您联系。`);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [copySuccess, setCopySuccess] = useState(false);
+  const handleShare = () => {
+    const slug = currentTenant?.slug;
+    if (!slug) return alert("无法生成分享链接");
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?s=${slug}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+       setCopySuccess(true);
+       setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
+
+  // 处理发送验证码
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginPass === localStorage.getItem(AUTH_KEY)) {
-      setViewMode('admin');
-      setErrorMsg("");
-      setLoginPass("");
+    if (!phone) return setErrorMsg("请输入手机号");
+    
+    setIsAuthLoading(true);
+    setErrorMsg("");
+    const { error } = await signInWithPhone(phone);
+    setIsAuthLoading(false);
+
+    if (error) {
+      setErrorMsg(error.message || "发送失败，请稍后重试");
     } else {
-      setErrorMsg("授权密码错误，请重试");
+      setIsOtpSent(true);
     }
+  };
+
+  // 处理验证码登入
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode) return setErrorMsg("请输入验证码");
+
+    setIsAuthLoading(true);
+    setErrorMsg("");
+    const { error } = await verifyOtp(phone, otpCode);
+    setIsAuthLoading(false);
+
+    if (error) {
+      setErrorMsg(error.message || "验证失败，请检查验证码");
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setViewMode('landing');
   };
 
   const goToSection = (index: number) => {
@@ -120,7 +236,7 @@ function App() {
     // 移除 window.scrollTo，因为现在是水平滑动
   };
 
-  const latestPlan = insurancePlans.find((p: any) => p.isLatest) || insurancePlans[0];
+  const latestPlan = insurancePlans.find((p: any) => p.is_latest) || insurancePlans[0] || INITIAL_PLANS[0];
 
   // --- Mobile Swipe Logic ---
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -164,8 +280,7 @@ function App() {
           assessmentQuestions={assessmentQuestions}
           setAssessmentQuestions={setAssessmentQuestions}
           onExit={() => setViewMode('landing')}
-          onLogout={() => setViewMode('landing')}
-          authKey={AUTH_KEY}
+          onLogout={handleLogout}
         />
       </Suspense>
     );
@@ -180,37 +295,60 @@ function App() {
             <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
               <Shield className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">管理后台登入</h1>
-            <p className="text-gray-500 mt-2 text-sm italic">InsurePro Admin System</p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">欢迎回来</h1>
+            <p className="text-gray-500 mt-2 text-sm italic">请先验证您的身份以进入系统</p>
           </div>
-          <form onSubmit={handleLogin} className="bg-card border border-white/10 p-8 rounded-[32px] shadow-2xl text-left">
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">用户名</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input readOnly value="admin" className="w-full bg-black/30 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-gray-400 cursor-not-allowed" />
+          
+          <div className="bg-card border border-white/10 p-8 rounded-[32px] shadow-2xl text-left">
+            {!isOtpSent ? (
+              <form onSubmit={handleSendOtp} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">手机号</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input 
+                      type="tel" placeholder="13800138000" required
+                      value={phone} onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary focus:outline-none transition-all"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">管理密码</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input 
-                    type={showPass ? "text" : "password"} autoFocus value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-12 focus:border-primary focus:outline-none transition-all font-mono"
-                  />
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
-                    {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
+                {errorMsg && <div className="text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
+                <button 
+                  type="submit" disabled={isAuthLoading}
+                  className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-4 hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
+                >
+                  {isAuthLoading ? "正在发送..." : "发送验证码"}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 text-left">验证码 (发送至 {phone})</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input 
+                      type="text" placeholder="123456" autoFocus required
+                      value={otpCode} onChange={(e) => setOtpCode(e.target.value)}
+                      className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:border-primary focus:outline-none transition-all font-mono tracking-[1em] text-center"
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-            {errorMsg && <div className="mt-6 text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
-            <button type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-8 hover:opacity-90 transition-all shadow-xl shadow-primary/20">确认登录</button>
-            <button type="button" onClick={() => setViewMode('landing')} className="w-full text-gray-500 text-xs font-bold mt-6 hover:text-white uppercase tracking-widest">← 返回站点首页</button>
-          </form>
+                {errorMsg && <div className="text-red-500 text-sm font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{errorMsg}</div>}
+            <button type="submit" disabled={isAuthLoading}
+                   className="w-full bg-primary text-white font-bold py-4 rounded-2xl mt-4 hover:opacity-90 transition-all shadow-xl shadow-primary/20 disabled:opacity-50"
+                 >
+                   {isAuthLoading ? "正在验证..." : "确认登录"}
+                 </button>
+                 <button 
+                   type="button" onClick={() => setIsOtpSent(false)}
+                   className="w-full text-gray-500 text-xs font-bold hover:text-white transition-colors"
+                 >
+                   修改手机号
+                 </button>
+               </form>
+             )}
+          </div>
         </div>
       </div>
     );
@@ -270,14 +408,14 @@ function App() {
                            {/* Avatar Image Wrapper */}
                            <div className="relative group cursor-pointer animate-in fade-in zoom-in duration-700">
                               <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:blur-2xl transition-all duration-500"></div>
-                              <img src="/assets/avatar.jpg" alt="彭艳" className="w-36 h-36 md:w-64 md:h-64 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <img src={tenantProfile?.avatar_url || "/assets/avatar.jpg"} alt={tenantProfile?.full_name || "经纪人"} className="w-36 h-36 md:w-64 md:h-64 rounded-full border-4 border-white/10 shadow-2xl relative z-10 object-cover group-hover:scale-105 transition-transform duration-500" />
                               <div className="absolute bottom-2 right-2 bg-primary text-white text-xs md:text-sm font-bold px-3 py-1 rounded-full border border-black/20 shadow-lg translate-y-1/4 translate-x-1/4 z-20">
                                 PRO
                               </div>
                            </div>
                            {/* Badge (Moved Here) */}
                            <div className="bg-white/5 backdrop-blur-xl border border-white/10 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-[10px] md:text-sm font-bold tracking-widest text-primary flex items-center gap-2 uppercase whitespace-nowrap shadow-lg">
-                                <Award className="w-3 h-3 md:w-4 md:h-4" /> 连续五年阳光精英
+                                <Award className="w-3 h-3 md:w-4 md:h-4" /> {tenantProfile?.raw_user_meta_data?.honor || '资深理财规划师'}
                            </div>
                        </div>
     
@@ -328,6 +466,12 @@ function App() {
                    <button onClick={() => setIsAssessmentOpen(true)} className="flex-1 md:flex-none px-6 py-3.5 md:px-8 md:py-5 bg-white text-black text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-white/10">
                       开启评估 <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
                    </button>
+                   {(currentTenant || user) && (
+                      <button onClick={handleShare} className={`flex-1 md:flex-none px-6 py-3.5 md:px-8 md:py-5 font-black rounded-2xl md:rounded-3xl transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-lg ${copySuccess ? 'bg-green-500/20 border-green-500 text-green-500' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
+                         <Share2 className="w-4 h-4 md:w-5 md:h-5" />
+                         <span className="text-sm md:text-lg">{copySuccess ? '已复制' : '分享链接'}</span>
+                      </button>
+                   )}
                    <button onClick={() => goToSection(1)} className="hidden md:flex flex-1 md:flex-none px-6 py-3.5 md:px-12 md:py-5 bg-neutral-900 border border-white/10 text-sm md:text-lg font-black rounded-2xl md:rounded-3xl hover:bg-neutral-800 transition-all items-center justify-center gap-2 cursor-pointer">
                      专属服务
                    </button>
@@ -348,7 +492,7 @@ function App() {
                          <TrendingUp className="w-4 h-4" /> 本月精选方案
                       </div>
                       <div className="max-h-[140px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                        {insurancePlans.filter((p: any) => p.isLatest).map((plan: any) => (
+                        {insurancePlans.filter((p: any) => p.is_latest).map((plan: any) => (
                            <div 
                              key={plan.id}
                              onClick={() => setIsPlansModalOpen(true)}
@@ -361,7 +505,7 @@ function App() {
                               <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors flex-shrink-0" />
                            </div>
                         ))}
-                        {insurancePlans.filter((p: any) => p.isLatest).length === 0 && (
+                        {insurancePlans.filter((p: any) => p.is_latest).length === 0 && (
                            <div className="text-xs text-gray-500 py-2 text-center">暂无精选方案</div>
                         )}
                       </div>
@@ -373,7 +517,7 @@ function App() {
                          <div className="w-1 h-3 bg-orange-400 rounded-full"></div> 实操案例
                       </div>
                       <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                        {cases.filter((item: any) => !item.isArchived).map((item) => (
+                        {cases.filter((item: any) => !item.is_archived).map((item) => (
                            <div 
                              key={item.id} 
                              onClick={() => setSelectedCase(item)}
@@ -448,7 +592,7 @@ function App() {
                       <div className="flex justify-between items-start">
                          <div>
                             <div className="text-lg font-bold text-white group-hover:text-primary transition-colors">{latestPlan.title}</div>
-                            <div className="text-sm text-gray-400 mt-1">{latestPlan.desc}</div>
+                            <div className="text-sm text-gray-400 mt-1">{latestPlan.description || latestPlan.desc}</div>
                          </div>
                          <ArrowRight className="text-white/30 group-hover:translate-x-1" />
                       </div>
@@ -498,11 +642,11 @@ function App() {
                   </div>
                 ))}
               </div>
-              <footer className="mt-auto py-12 border-t border-white/5 text-center text-gray-500 text-sm">
-                 <div className="mb-4 flex justify-center items-center gap-2 text-white font-bold"><Shield className="w-5 h-5"/> InsurePro · 彭艳</div>
-                 <p>© 2026 彭艳 · 阳光保险集团 | 高级理财规划师</p>
+               <footer className="mt-auto py-12 border-t border-white/5 text-center text-gray-500 text-sm">
+                  <div className="mb-4 flex justify-center items-center gap-2 text-white font-bold"><Shield className="w-5 h-5"/> InsurePro · {tenantProfile?.full_name || '彭艳'}</div>
+                  <p>© 2026 {tenantProfile?.full_name || '彭艳'} · {tenantProfile?.raw_user_meta_data?.company || '阳光保险集团'} | {tenantProfile?.raw_user_meta_data?.title || '高级理财规划师'}</p>
                  <div className="mt-4 flex justify-center gap-6">
-                    <button onClick={() => setViewMode('login')} className="hover:text-white underline">管理入口</button>
+                    <button onClick={() => setViewMode('admin')} className="hover:text-white underline">管理入口</button>
                     <button className="hover:text-white">隐私政策</button>
                  </div>
               </footer>
@@ -541,7 +685,7 @@ function App() {
                  </button>
               ))}
               <div className="h-px bg-white/10 my-1"></div>
-              <button onClick={() => setViewMode('login')} className="w-full flex items-center gap-2 p-2.5 rounded-xl hover:bg-white/5 text-gray-300 text-xs font-bold active:bg-white/10 text-left">
+              <button onClick={() => setViewMode('admin')} className="w-full flex items-center gap-2 p-2.5 rounded-xl hover:bg-white/5 text-gray-300 text-xs font-bold active:bg-white/10 text-left">
                  <Lock className="w-4 h-4"/> 管理入口
               </button>
            </div>
@@ -584,24 +728,7 @@ function App() {
         </div>
       </div>
 
-      {/* Admin Dashboard */}
-      {viewMode === 'admin' && (
-          <Suspense fallback={<div className="min-h-screen grid place-items-center text-white">加载后台系统中...</div>}>
-            <AdminDashboard 
-              inquiries={inquiries} 
-              insurancePlans={insurancePlans}
-              cases={cases}
-              assessmentQuestions={assessmentQuestions}
-              setInquiries={setInquiries}
-              setInsurancePlans={setInsurancePlans}
-              setCases={setCases}
-              setAssessmentQuestions={setAssessmentQuestions}
-              onExit={() => setViewMode('landing')}
-              onLogout={() => { setViewMode('login'); localStorage.removeItem(AUTH_KEY); }}
-              authKey={AUTH_KEY}
-            />
-          </Suspense>
-        )}
+      {/* Admin Dashboard (Handled via early return) */}
 
       {/* 弹窗组件 */}
       <AppointmentModal 

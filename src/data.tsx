@@ -78,14 +78,7 @@ export const CASES = [
   { id: 3, title: "家庭信托：资产隔离与定向传承实操", tag: "法商智慧", image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=200&h=150" }
 ];
 
-export interface AssessmentQuestion {
-  id: number;
-  question: string;
-  type: 'single' | 'multiple';
-  options: string[];
-}
-
-export const ASSESSMENT_QUESTIONS: AssessmentQuestion[] = [
+export const ASSESSMENT_QUESTIONS: any[] = [
   {
     id: 1,
     question: "您的年龄段位于？",

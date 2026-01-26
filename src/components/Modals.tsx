@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, CheckCircle2, ChevronDown, User, Calendar, ArrowRight, ChevronRight } from "lucide-react";
-import { AssessmentQuestion } from "../data";
+import { AssessmentQuestion } from "../types";
 import { useState, useEffect } from "react";
 
 // ... existing interfaces ...
@@ -281,7 +281,7 @@ export const PlansModal = ({ isOpen, onClose, plans }: PlansModalProps) => {
                   <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">保障权益核心</div>
                   <div className="text-xl font-bold text-primary">{plan.benefit}</div>
                 </div>
-                <p className="text-gray-400 text-sm leading-relaxed mb-8">{plan.desc}</p>
+                <p className="text-gray-400 text-sm leading-relaxed mb-8">{plan.description || plan.desc}</p>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-primary font-bold text-sm">
                     <CheckCircle2 className="w-5 h-5" /> 官方正版授权

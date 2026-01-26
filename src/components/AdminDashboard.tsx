@@ -6,19 +6,20 @@ import {
 } from "lucide-react";
 import { ThemeSelector } from "../ThemeSelector";
 import { searchNews } from "../services/SearchService";
+import { db } from "../services/db";
+import { InsurancePlan, Case, Inquiry, AssessmentQuestion } from "../types";
 
 interface AdminDashboardProps {
-  inquiries: any[];
-  insurancePlans: any[];
-  cases: any[];
-  assessmentQuestions: any[];
-  setInquiries: (data: any[]) => void;
-  setInsurancePlans: (data: any[]) => void;
-  setCases: (data: any[]) => void;
-  setAssessmentQuestions: (data: any[]) => void;
+  inquiries: Inquiry[];
+  insurancePlans: InsurancePlan[];
+  cases: Case[];
+  assessmentQuestions: AssessmentQuestion[];
+  setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
+  setInsurancePlans: React.Dispatch<React.SetStateAction<InsurancePlan[]>>;
+  setCases: React.Dispatch<React.SetStateAction<Case[]>>;
+  setAssessmentQuestions: React.Dispatch<React.SetStateAction<AssessmentQuestion[]>>;
   onExit: () => void;
   onLogout: () => void;
-  authKey: string;
 }
 
 const AdminDashboard = ({ 
@@ -31,8 +32,7 @@ const AdminDashboard = ({
   setCases, 
   setAssessmentQuestions,
   onExit, 
-  onLogout,
-  authKey
+  onLogout
 }: AdminDashboardProps) => {
   const [adminTab, setAdminTab] = useState<'dashboard' | 'messages' | 'appearance' | 'plans' | 'cases' | 'assessment'>('dashboard');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
@@ -51,19 +51,21 @@ const AdminDashboard = ({
   // Case Archival State
   const [caseView, setCaseView] = useState<'published' | 'archived'>('published');
 
-  const handleArchiveCase = (id: number) => {
-    setCases(cases.map((c: any) => c.id === id ? { ...c, isArchived: true } : c));
+  const handleArchiveCase = async (id: string) => {
+    const { data, error } = await db.upsertCase({ id, is_archived: true });
+    if (!error && data) setCases(cases.map(c => c.id === id ? data as Case : c));
   };
 
-  const handleRestoreCase = (id: number) => {
-    setCases(cases.map((c: any) => c.id === id ? { ...c, isArchived: false } : c));
+  const handleRestoreCase = async (id: string) => {
+    const { data, error } = await db.upsertCase({ id, is_archived: false });
+    if (!error && data) setCases(cases.map(c => c.id === id ? data as Case : c));
   };
 
   // Assessment Config State
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
 
-  const handleSaveQuestion = (e: React.FormEvent) => {
+  const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     // parse options from comma separated string if strictly string, or keep array
     // assuming editingQuestion.options is a string when editing, need to convert
@@ -71,86 +73,109 @@ const AdminDashboard = ({
     
     const formatted = { ...editingQuestion, options: optionsArray };
 
-    if (formatted.id) {
-       setAssessmentQuestions(assessmentQuestions.map(q => q.id === formatted.id ? formatted : q));
-    } else {
-       const newId = Math.max(0, ...assessmentQuestions.map(q => q.id)) + 1;
-       setAssessmentQuestions([...assessmentQuestions, { ...formatted, id: newId }]);
+    const { data, error } = await db.upsertAssessmentQuestion(formatted);
+    if (error) return alert(error.message);
+    
+    if (data) {
+        if (editingQuestion.id) {
+            setAssessmentQuestions(assessmentQuestions.map(q => q.id === data.id ? data as AssessmentQuestion : q));
+        } else {
+            setAssessmentQuestions([...assessmentQuestions, data as AssessmentQuestion]);
+        }
     }
     setShowQuestionForm(false);
     setEditingQuestion(null);
   };
 
-  const handleDeleteQuestion = (id: number) => {
+  const handleDeleteQuestion = async (id: string) => {
       if(confirm('确定删除此问题吗？')) {
-          setAssessmentQuestions(assessmentQuestions.filter(q => q.id !== id));
+          const { error } = await db.deleteAssessmentQuestion(id);
+          if (!error) setAssessmentQuestions(assessmentQuestions.filter(q => q.id !== id));
       }
   };
 
-  // Password State
-  const [passForm, setPassForm] = useState({ old: "", new: "", confirm: "" });
-  const [passChangeMsg, setPassChangeMsg] = useState({ text: "", type: "" });
+  // Password State (Legacy removed)
+  // const [passForm, setPassForm] = useState({ old: "", new: "", confirm: "" });
+  // const [passChangeMsg, setPassChangeMsg] = useState({ text: "", type: "" });
 
   const CASE_TAGS = ["重疾理赔", "财富增值", "法商智慧", "养老规划", "医疗理赔"];
   const SEARCH_PRESETS = ["重疾险案例", "家庭信托案例", "养老金规划", "百万医疗理赔"];
 
   // ... (keep inquiry handlers same) ...
 
-  const handleToggleInquiryStatus = (id: number) => {
-    setInquiries(inquiries.map(i => 
-      i.id === id ? { ...i, status: i.status === 'pending' ? 'completed' : 'pending' } : i
-    ));
+  const handleToggleInquiryStatus = async (id: string, currentStatus: Inquiry['status']) => {
+    const nextStatus = currentStatus === 'pending' ? 'contacted' : 'pending';
+    const { error } = await db.updateInquiryStatus(id, nextStatus);
+    if (!error) {
+        setInquiries(inquiries.map(i => i.id === id ? { ...i, status: nextStatus } : i));
+    }
   };
 
-  const handleDeleteInquiry = (id: number) => {
+  const handleDeleteInquiry = async (id: string) => {
     if (confirm("确定要删除这条咨询记录吗？")) {
-      setInquiries(inquiries.filter(i => i.id !== id));
+      const { error } = await db.deleteInquiry(id);
+      if (!error) setInquiries(inquiries.filter(i => i.id !== id));
     }
   };
 
   // ... (keep plan handlers same) ...
-  const handleSetLatest = (id: number) => {
-    setInsurancePlans(insurancePlans.map((p: any) => ({ ...p, isLatest: p.id === id })));
+  const handleSetLatest = async (id: string) => {
+    const { data, error } = await db.upsertPlan({ id, is_latest: true });
+    if (!error && data) {
+         setInsurancePlans(insurancePlans.map(p => ({ ...p, is_latest: p.id === id })));
+    }
   };
 
-  const handleSavePlan = (e: React.FormEvent) => {
+  const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingPlan.id) {
-      setInsurancePlans(insurancePlans.map((p: any) => p.id === editingPlan.id ? editingPlan : p));
-    } else {
-      const newId = Math.max(0, ...insurancePlans.map((p: any) => p.id)) + 1;
-      setInsurancePlans([...insurancePlans, { ...editingPlan, id: newId }]);
+    const { data, error } = await db.upsertPlan(editingPlan);
+    if (error) return alert(error.message);
+    
+    if (data) {
+        if (editingPlan.id) {
+            setInsurancePlans(insurancePlans.map(p => p.id === data.id ? data as InsurancePlan : p));
+        } else {
+            setInsurancePlans([data as InsurancePlan, ...insurancePlans]);
+        }
     }
     setShowPlanForm(false);
     setEditingPlan(null);
   };
 
-  const handleDeletePlan = (id: number) => {
+  const handleDeletePlan = async (id: string) => {
     if (confirm("确定要删除这个保险方案吗？")) {
-      setInsurancePlans(insurancePlans.filter((p: any) => p.id !== id));
+      const { error } = await db.deletePlan(id);
+      if (!error) setInsurancePlans(insurancePlans.filter(p => p.id !== id));
     }
   };
 
   // Case Handlers
-  const handleSaveCase = (e: React.FormEvent) => {
+  const handleSaveCase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingCase.id) {
-      setCases(cases.map((c: any) => c.id === editingCase.id ? editingCase : c));
-    } else {
-      const newId = Math.max(0, ...cases.map((c: any) => c.id)) + 1;
-      setCases([...cases, { ...editingCase, id: newId }]);
+    const { data, error } = await db.upsertCase(editingCase);
+    if (error) return alert(error.message);
+    
+    if (data) {
+        if (editingCase.id) {
+            setCases(cases.map(c => c.id === data.id ? data as Case : c));
+        } else {
+            setCases([data as Case, ...cases]);
+        }
     }
     setShowCaseForm(false);
     setEditingCase(null);
   };
 
-  const handleDeleteCase = (id: number) => {
-    if (confirm("确定要删除这个案例吗？")) setCases(cases.filter((c: any) => c.id !== id));
+  const handleDeleteCase = async (id: string) => {
+    if (confirm("确定要删除这个案例吗？")) {
+        const { error } = await db.deleteCase(id);
+        if (!error) setCases(cases.filter(c => c.id !== id));
+    }
   };
 
-   const [searchEngine, setSearchEngine] = useState<'baidu' | 'bing'>('baidu');
+  const [searchEngine, setSearchEngine] = useState<'baidu' | 'bing'>('baidu');
 
-   const handleSearchNews = async (keyword: string) => {
+  const handleSearchNews = async (keyword: string) => {
     setSearchLoading(true);
     setSearchKeyword(keyword);
     const results = await searchNews(keyword, searchEngine);
@@ -166,22 +191,6 @@ const AdminDashboard = ({
       image: "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=200&h=150", 
       tag: "行业资讯" // 默认标签
     });
-  };
-
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    const stored = localStorage.getItem(authKey);
-    if (passForm.old !== stored) {
-      setPassChangeMsg({ text: "旧密码验证失败", type: "error" });
-      return;
-    }
-    if (passForm.new !== passForm.confirm) {
-      setPassChangeMsg({ text: "两次输入的新密码不一致", type: "error" });
-      return;
-    }
-    localStorage.setItem(authKey, passForm.new);
-    setPassChangeMsg({ text: "密码修改成功！", type: "success" });
-    setPassForm({ old: "", new: "", confirm: "" });
   };
 
   return (
@@ -279,23 +288,7 @@ const AdminDashboard = ({
                      </div>
                    ))}
                  </div>
-                 {/* Password Reset Section */}
-                 <section className="bg-card p-12 rounded-[56px] border border-white/5 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-12 opacity-[0.03]"><Lock className="w-64 h-64" /></div>
-                   <div className="flex items-center gap-4 mb-10 relative z-10">
-                     <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary"><Settings className="w-6 h-6" /></div>
-                     <h3 className="text-3xl font-bold">安全与授权密码</h3>
-                   </div>
-                   <form onSubmit={handleChangePassword} className="max-w-md space-y-8 relative z-10 text-left">
-                     <input type="password" required placeholder="当前验证密码" value={passForm.old} onChange={(e) => setPassForm({...passForm, old: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-2xl p-5 focus:border-primary focus:outline-none" />
-                     <div className="grid grid-cols-2 gap-4">
-                       <input type="password" required placeholder="新密码" value={passForm.new} onChange={(e) => setPassForm({...passForm, new: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-2xl p-5 focus:border-primary focus:outline-none" />
-                       <input type="password" required placeholder="确认新密码" value={passForm.confirm} onChange={(e) => setPassForm({...passForm, confirm: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-2xl p-5 focus:border-primary focus:outline-none" />
-                     </div>
-                     {passChangeMsg.text && <div className={`p-4 rounded-xl text-sm ${passChangeMsg.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>{passChangeMsg.text}</div>}
-                     <button type="submit" className="bg-primary text-white font-bold px-10 py-4 rounded-2xl shadow-xl shadow-primary/20 hover:opacity-90">更新后台授权密码</button>
-                   </form>
-                 </section>
+                 {/* Password Reset Section (Legacy removed) */}
               </>
             )}
 
@@ -306,18 +299,15 @@ const AdminDashboard = ({
                 {inquiries.map((item: any) => (
                   <div key={item.id} className={`p-8 rounded-[40px] border flex flex-col md:flex-row items-center justify-between gap-6 ${item.status === 'pending' ? 'bg-primary/5 border-primary/20' : 'bg-card border-white/5 opacity-60'}`}>
                     <div className="flex-grow space-y-2">
-                       <div className="flex items-center gap-3">
-                          <span className="text-xl font-bold">{item.name}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl font-bold">{item.customer_name}</span>
                           <span className="text-gray-500 text-xs font-mono">{item.phone}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.willingToCall ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'}`}>
-                            {item.willingToCall ? '愿意电话联系' : '仅在线沟通'}
-                          </span>
                         </div>
-                        <p className="text-gray-400 text-sm bg-black/20 p-4 rounded-2xl italic">“ {item.finalContent || item.content || item.subject} ”</p>
-                        <div className="text-[10px] text-gray-600 font-bold">2026.01.26</div>
+                        <p className="text-gray-400 text-sm bg-black/20 p-4 rounded-2xl italic">“ {item.subject} ”</p>
+                        <div className="text-[10px] text-gray-600 font-bold">{new Date(item.created_at).toLocaleDateString()}</div>
                     </div>
                     <div className="flex gap-3">
-                      <button onClick={() => handleToggleInquiryStatus(item.id)} className={`px-6 py-3 rounded-xl font-bold text-xs ${item.status === 'pending' ? 'bg-primary text-white' : 'bg-white/5 text-gray-500'}`}>
+                      <button onClick={() => handleToggleInquiryStatus(item.id, item.status)} className={`px-6 py-3 rounded-xl font-bold text-xs ${item.status === 'pending' ? 'bg-primary text-white' : 'bg-white/5 text-gray-500'}`}>
                         {item.status === 'pending' ? '完成处理' : '恢复待办'}
                       </button>
                       <button onClick={() => handleDeleteInquiry(item.id)} className="p-3 bg-white/5 rounded-xl text-gray-500 hover:text-red-500"><Trash2 className="w-5 h-5" /></button>
@@ -331,28 +321,66 @@ const AdminDashboard = ({
               <div className="space-y-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold">方案列表</h3>
-                  <button onClick={() => { setEditingPlan({ company: "阳光人寿", title: "", type: "理财保障", highlight: "", benefit: "", desc: "", isLatest: false }); setShowPlanForm(true); }} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus className="w-5 h-5" /> 新增方案</button>
+                  <button onClick={() => { setEditingPlan({ company: "阳光人寿", title: "", type: "理财保障", highlight: "", benefit: "", description: "", is_latest: false }); setShowPlanForm(true); }} className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus className="w-5 h-5" /> 新增方案</button>
                 </div>
 
                 {showPlanForm ? (
-                   <form onSubmit={handleSavePlan} className="bg-card p-10 rounded-[40px] space-y-6">
-                      <input placeholder="方案标题" value={editingPlan.title} onChange={e => setEditingPlan({...editingPlan, title: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" />
-                      <div className="flex gap-4">
-                        <button type="submit" className="bg-primary px-8 py-3 rounded-xl font-bold">保存</button>
-                        <button type="button" onClick={() => setShowPlanForm(false)} className="px-8 py-3 bg-white/5 rounded-xl">取消</button>
+                   <form onSubmit={handleSavePlan} className="bg-card p-10 rounded-[40px] space-y-6 animate-in slide-in-from-bottom-4">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">方案标题</label>
+                          <input placeholder="例如：月月盈年金保险" value={editingPlan.title} onChange={e => setEditingPlan({...editingPlan, title: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" required />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">保险公司</label>
+                          <input placeholder="例如：阳光人寿" value={editingPlan.company} onChange={e => setEditingPlan({...editingPlan, company: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" required />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">保障类型</label>
+                          <input placeholder="例如：重疾保障 / 财富增值" value={editingPlan.type} onChange={e => setEditingPlan({...editingPlan, type: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" required />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">核心利益 (Benefit)</label>
+                          <input placeholder="例如：最高保障 120万" value={editingPlan.benefit} onChange={e => setEditingPlan({...editingPlan, benefit: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" required />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">亮点 (Highlight) - 用 " · " 分隔</label>
+                        <input placeholder="例如：极速理赔 · 覆盖全家 · 意外伤害" value={editingPlan.highlight} onChange={e => setEditingPlan({...editingPlan, highlight: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4" required />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">方案描述</label>
+                        <textarea rows={4} placeholder="详细描述该保险方案的优势和覆盖范围..." value={editingPlan.description} onChange={e => setEditingPlan({...editingPlan, description: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded-xl p-4 resize-none" required />
+                      </div>
+                      <div className="flex gap-4 pt-4 border-t border-white/5">
+                        <button type="submit" className="bg-primary px-8 py-3 rounded-xl font-bold shadow-xl shadow-primary/20">保存方案</button>
+                        <button type="button" onClick={() => setShowPlanForm(false)} className="px-8 py-3 bg-white/5 rounded-xl font-bold">取消</button>
                       </div>
                    </form>
                 ) : (
-                  <div className="space-y-4">
-                    {insurancePlans.map((plan: any) => (
-                      <div key={plan.id} className="p-6 rounded-[32px] border bg-card border-white/5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs text-gray-500 mb-1">{plan.company}</div>
-                          <div className="font-bold">{plan.title}</div>
+                  <div className="grid gap-4">
+                    {insurancePlans.map((plan: InsurancePlan) => (
+                      <div key={plan.id} className="p-6 rounded-[32px] border bg-card border-white/5 flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${plan.is_latest ? 'bg-primary/20 text-primary' : 'bg-white/5 text-gray-500'}`}>
+                            <FileSpreadsheet className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{plan.company}</span>
+                              {plan.is_latest && <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[8px] font-black uppercase">Latest</span>}
+                            </div>
+                            <div className="font-bold">{plan.title}</div>
+                          </div>
                         </div>
                         <div className="flex gap-2">
-                           <button onClick={() => { setEditingPlan(plan); setShowPlanForm(true); }} className="p-2 bg-white/5 rounded-lg"><Edit3 className="w-5 h-5" /></button>
-                           <button onClick={() => handleDeletePlan(plan.id)} className="p-2 bg-white/5 rounded-lg"><Trash2 className="w-5 h-5" /></button>
+                           {!plan.is_latest && (
+                             <button onClick={() => handleSetLatest(plan.id)} className="px-3 py-1.5 bg-white/5 hover:bg-primary/10 hover:text-primary rounded-lg text-xs font-bold transition-all">设为精选</button>
+                           )}
+                           <button onClick={() => { setEditingPlan(plan); setShowPlanForm(true); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10"><Edit3 className="w-5 h-5 text-gray-500" /></button>
+                           <button onClick={() => handleDeletePlan(plan.id)} className="p-2 bg-white/5 rounded-lg hover:text-red-500"><Trash2 className="w-5 h-5 text-gray-500" /></button>
                         </div>
                       </div>
                     ))}
@@ -486,7 +514,7 @@ const AdminDashboard = ({
                      </div>
                   ) : (
                     <div className="grid md:grid-cols-2 gap-4">
-                       {cases.filter((c: any) => caseView === 'published' ? !c.isArchived : c.isArchived).map((c: any) => (
+                       {cases.filter((c: Case) => caseView === 'published' ? !c.is_archived : c.is_archived).map((c: Case) => (
                           <div key={c.id} className="p-4 rounded-[28px] border border-white/5 bg-card flex items-center gap-4 group">
                              <div className="w-16 h-16 rounded-2xl bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${c.image})` }}></div>
                              <div className="flex-grow min-w-0">
