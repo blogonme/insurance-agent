@@ -73,9 +73,30 @@ export const INQUIRY_SUBJECTS = [
 ];
 
 export const CASES = [
-  { id: 1, title: "理赔实录：320万医疗费全额赔付", tag: "重疾理赔", image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=200&h=150" },
-  { id: 2, title: "养老规划：35岁如何布局千万养老金", tag: "财富增值", image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=200&h=150" },
-  { id: 3, title: "家庭信托：资产隔离与定向传承实操", tag: "法商智慧", image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=200&h=150" }
+  { 
+    id: 1, 
+    title: "理赔实录：320万医疗费全额赔付", 
+    tag: "重疾理赔", 
+    image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=600&h=400",
+    description: "本案例记录了一位 45 岁企业主突发脑溢血后的理赔全过程。在治疗期间产生了高达 320 万元的医疗及康复费用。得益于早期配置的足额重疾险与百万医疗险组合，我们在报案后 48 小时内即完成了资料初审，并在极短时间内实现了费用的全数覆盖汇报。",
+    expert_insight: "该案例的核心价值在于“双重对冲”：重疾险提供的大笔现金流保证了病患及家属的心理与生活平稳，而百万医疗险则夯实了高端医疗资源的无忧接入。提前 5 年的保额动态升级是此次理赔能够完全覆盖损益的关键。"
+  },
+  { 
+    id: 2, 
+    title: "养老规划：35岁如何布局千万养老金", 
+    tag: "财富增值", 
+    image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=600&h=400",
+    description: "理财不只是当下的收支，更是对未来的赋能。本案例展示了一位资深中产通过分红型年金与定期理财结合，在保持当前生活品质的同时，成功通过‘复利之火’在 60 岁退休时构建了预估超过 1200 万的现金价值养老池。",
+    expert_insight: "养老规划切忌“临阵磨枪”。35 岁是利用复利杠杆的最佳窗口期。通过底层确定的现金价值分配，配合浮动分红追求超额收益，是高净值人群实现跨周期财富配置的标准范式。"
+  },
+  { 
+    id: 3, 
+    title: "家庭信托：资产隔离与定向传承实操", 
+    tag: "法商智慧", 
+    image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600&h=400",
+    description: "资产的‘多’不代表‘稳’。在本实操案中，我们利用家族信托架构，成功地将一位客户的个人经营风险与家庭生活资产进行了法律层面的物理隔离。并在之后遭遇企业诉讼时，依然保全了为其子女预留的教育金及生活费。",
+    expert_insight: "保险信托是资产保全的‘顶层设计’。它的核心逻辑不是追求收益，而是确立‘归属’。通过确定的受益人清单与严密的法律嵌套，我们让财富在特定规则下流向特定的人，规避了由于婚姻风险或负债追索带来的损耗。"
+  }
 ];
 
 export const ASSESSMENT_QUESTIONS: any[] = [

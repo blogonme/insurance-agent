@@ -1,6 +1,6 @@
 
 import { supabase } from '../supabaseClient';
-import { InsurancePlan, Case, Inquiry, AssessmentQuestion, Testimonial, KnowledgeItem } from '../types';
+import { InsurancePlan, Case, Inquiry, AssessmentQuestion, Testimonial, KnowledgeItem, ProductKnowledge } from '../types';
 
 export const db = {
   // --- Tenant Resolution ---
@@ -54,8 +54,10 @@ export const db = {
   async createInquiry(inquiry: Partial<Inquiry>) {
     return supabase.from('inquiries').insert(inquiry).select().single();
   },
-  async updateInquiryStatus(id: string, status: Inquiry['status']) {
-    return supabase.from('inquiries').update({ status }).eq('id', id);
+  async updateInquiryStatus(id: string, status: Inquiry['status'], notes?: string) {
+    const updateData: any = { status };
+    if (notes !== undefined) updateData.handling_notes = notes;
+    return supabase.from('inquiries').update(updateData).eq('id', id);
   },
   async deleteInquiry(id: string) {
     return supabase.from('inquiries').delete().eq('id', id);
@@ -64,7 +66,12 @@ export const db = {
   // --- Assessment Questions ---
   async getAssessmentQuestions(tenantId?: string) {
     let query = supabase.from('assessment_questions').select('*');
-    if (tenantId) query = query.eq('tenant_id', tenantId);
+    if (tenantId) {
+      // Fetch both global and tenant-specific questions
+      query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+    } else {
+      query = query.is('tenant_id', null);
+    }
     return query.order('order', { ascending: true });
   },
   async upsertAssessmentQuestion(question: Partial<AssessmentQuestion>) {
@@ -86,5 +93,24 @@ export const db = {
     let query = supabase.from('knowledge_items').select('*');
     if (tenantId) query = query.eq('tenant_id', tenantId);
     return query.order('created_at', { ascending: false });
+  },
+
+  // --- Product Knowledge (RAG) ---
+  async getProductKnowledge(planId: string) {
+    return supabase.from('product_knowledge').select('*').eq('plan_id', planId).order('created_at', { ascending: true });
+  },
+  async upsertProductKnowledge(knowledge: Partial<ProductKnowledge>) {
+    return supabase.from('product_knowledge').upsert(knowledge).select().single();
+  },
+  async deleteProductKnowledge(id: string) {
+    return supabase.from('product_knowledge').delete().eq('id', id);
+  },
+  async searchProductKnowledge(embedding: number[], matchCount: number = 5) {
+    const { data, error } = await supabase.rpc('match_product_knowledge', {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: matchCount,
+    });
+    return { data, error };
   }
 };

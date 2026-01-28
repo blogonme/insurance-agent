@@ -1,20 +1,31 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@100..900&display=swap');
 
 :root {
-  --primary-color: #f97316;
-  --font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  --base-font-size: 16px;
+  /* 精英信赖 (Elite Trust) 核心色值 */
+  --primary-color: #0F172A;    /* Deep Navy */
+  --accent-color: #D4AF37;     /* Champagne Gold */
+  --accent-hover: #B48F2D;     /* Darker Gold */
+  --bg-soft: #F8FAFC;          /* Secondary BG */
+  --text-main: #0F172A;
+  --text-muted: #64748B;
   
-  font-family: var(--font-family);
-  font-size: var(--base-font-size);
-  line-height: 1.5;
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  
+  --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-blur: blur(20px);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background: var(--app-background);
+  color: var(--text-main);
+  background-color: white;
 
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -22,32 +33,61 @@
 
 body {
   margin: 0;
-  display: block;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--app-background);
+  background-color: white;
+  overflow-x: hidden;
 }
 
-/* 一些通用的动态颜色类辅助 */
-.text-primary {
-  color: var(--primary-color) !important;
+/* 字体类 */
+.font-serif { font-family: var(--font-serif); }
+.font-sans { font-family: var(--font-sans); }
+
+/* 精英组件库辅助类 */
+.elite-glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.bg-primary {
-  background-color: var(--primary-color) !important;
+.text-gold { color: var(--accent-color); }
+.bg-navy { background-color: var(--primary-color); }
+.bg-gold { background-color: var(--accent-color); }
+
+.elite-button {
+  padding: 1rem 2.5rem;
+  border-radius: 1rem;
+  font-weight: 800;
+  transition: var(--transition-smooth);
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.1);
 }
 
-.bg-card {
-  background-color: var(--card-background) !important;
-  backdrop-filter: blur(12px);
+.elite-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.2);
 }
 
-.border-primary {
-  border-color: var(--primary-color) !important;
+.elite-card {
+  background: white;
+  border: 1px solid #F1F5F9;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-smooth);
 }
 
-.shadow-primary {
-  --tw-shadow-color: var(--primary-color);
-  --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+.elite-card:hover {
+  border-bottom-color: var(--accent-color);
+  transform: translateY(-4px);
+  box-shadow: 0 30px 60px -15px rgba(15, 23, 42, 0.05);
+}
+
+/* 自定义滚动条 */
+.scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-container::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 10px;
 }
